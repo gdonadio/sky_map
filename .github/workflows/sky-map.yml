@@ -1,0 +1,31 @@
+name: Generate Sky Map
+
+on:
+  schedule:
+    - cron: "28,58 * * * *"
+  workflow_dispatch:
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate sky map
+        run: python sky_map_bw.py
+
+      - name: Upload output artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sky-map-output
+          path: output/sky_map_bw.png

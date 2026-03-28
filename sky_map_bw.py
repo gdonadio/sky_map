@@ -1,13 +1,17 @@
-from plotly.subplots import make_subplots
 import os
+from pathlib import Path
 
 import numpy as np
 import plotly.graph_objects as go
-from skyfield.api import Topos, load
+from plotly.subplots import make_subplots
+from skyfield.api import Loader, Topos
 
-os.makedirs("output", exist_ok=True)
+ROOT_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = ROOT_DIR / "output"
+OUTPUT_DIR.mkdir(exist_ok=True)
 
 # --- Skyfield setup ---
+load = Loader(str(ROOT_DIR))
 eph = load("de440s.bsp")
 latitude, longitude = 42.3736, -71.1097
 observer = eph["earth"] + Topos(
@@ -196,5 +200,7 @@ fig.update_layout(
     ),
 )
 
-fig.write_image("output/sky_map_bw.png", width=1200, height=825, engine="kaleido")
-fig.show()
+fig.write_image(OUTPUT_DIR / "sky_map_bw.png", width=1200, height=825, engine="kaleido")
+
+if os.environ.get("GITHUB_ACTIONS") != "true":
+    fig.show()
