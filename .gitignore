@@ -7,3 +7,4 @@ de440s.bsp
 
 output/*
 !output/.gitkeep
+!output/sky_map_bw.png
