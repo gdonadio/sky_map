@@ -5,6 +5,9 @@ on:
     - cron: "28,58 * * * *"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -24,8 +27,12 @@ jobs:
       - name: Generate sky map
         run: python sky_map_bw.py
 
-      - name: Upload output artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sky-map-output
-          path: output/sky_map_bw.png
+      - name: Commit updated image
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add output/sky_map_bw.png
+          git diff --cached --quiet || git commit -m "Update sky map image"
+
+      - name: Push changes
+        run: git push origin main
