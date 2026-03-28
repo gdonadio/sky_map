@@ -1,0 +1,9 @@
+.DS_Store
+.ipynb_checkpoints/
+.vscode/
+sky_map_venv/
+*.ipynb
+de440s.bsp
+
+output/*
+!output/.gitkeep
