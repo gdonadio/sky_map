@@ -42,6 +42,23 @@ def rotate_az(az_deg, delta_deg):
     return (az_deg + delta_deg) % 360.0
 
 
+def circle_in_plane(normal, radius=1, n_points=240):
+    normal = np.asarray(normal, dtype=float)
+    normal = normal / np.linalg.norm(normal)
+    ref = np.array([0.0, 0.0, 1.0])
+    if np.allclose(np.abs(np.dot(normal, ref)), 1.0):
+        ref = np.array([0.0, 1.0, 0.0])
+
+    u = np.cross(normal, ref)
+    u = u / np.linalg.norm(u)
+    v = np.cross(normal, u)
+
+    theta = np.linspace(0, 2 * np.pi, n_points)
+    points = [radius * (np.cos(t) * u + np.sin(t) * v) for t in theta]
+    x, y, z = zip(*points)
+    return x, y, z
+
+
 LEFT_AXIS_ROTATION = -12
 RIGHT_AXIS_ROTATION = 12
 LEFT_VIEW_ROTATION = 90 + LEFT_AXIS_ROTATION
@@ -59,10 +76,6 @@ for name, data in bodies.items():
         alt.degrees, rotate_az(az.degrees, RIGHT_VIEW_ROTATION)
     )
 
-# Define sphere
-u, v = np.mgrid[0 : 2 * np.pi : 80j, 0 : np.pi : 40j]
-sx, sy, sz = np.sin(v) * np.cos(u), np.sin(v) * np.sin(u), np.cos(v)
-
 # --- Plotly: Two larger scenes side-by-side, no titles ---
 fig = make_subplots(
     rows=1,
@@ -73,19 +86,37 @@ fig = make_subplots(
 
 
 def add_scene(fig, col, positions, axis_rotation=0, base_rotation=0, equator_dash="solid"):
+    camera_eye = np.array([1.25, 1.25, 0.5])
+    halo_x, halo_y, halo_z = circle_in_plane(camera_eye, radius=1.005)
     fig.add_trace(
-        go.Surface(
-            x=sx,
-            y=sy,
-            z=sz,
-            colorscale="Greys",
-            opacity=0.1,
-            showscale=False,
+        go.Scatter3d(
+            x=halo_x,
+            y=halo_y,
+            z=halo_z,
+            mode="lines",
+            line=dict(color="rgba(0,0,0,0.07)", width=7),
             showlegend=False,
         ),
         row=1,
         col=col,
     )
+
+    for latitude in [-45, -20, 20, 45]:
+        ring_az = rotate_az(np.linspace(0, 360, 240), base_rotation + axis_rotation)
+        rx, ry, rz = zip(*[spherical_to_cartesian(latitude, az) for az in ring_az])
+        fig.add_trace(
+            go.Scatter3d(
+                x=rx,
+                y=ry,
+                z=rz,
+                mode="lines",
+                line=dict(color="rgba(0,0,0,0.25)", width=1),
+                showlegend=False,
+            ),
+            row=1,
+            col=col,
+        )
+
     for name, (x, y, z) in positions.items():
         mag = bodies[name]["magnitude"]
         size = (
@@ -138,7 +169,11 @@ def add_scene(fig, col, positions, axis_rotation=0, base_rotation=0, equator_das
             y=ey,
             z=ez,
             mode="lines",
-            line=dict(color="black", width=2, dash=equator_dash),
+            line=(
+                dict(color="black", width=2)
+                if equator_dash == "solid"
+                else dict(color="black", width=2, dash=equator_dash)
+            ),
             showlegend=False,
         ),
         row=1,
@@ -163,7 +198,14 @@ def add_scene(fig, col, positions, axis_rotation=0, base_rotation=0, equator_das
             col=col,
         )
 
-add_scene(fig, 1, positions_left, axis_rotation=LEFT_AXIS_ROTATION, base_rotation=90)
+add_scene(
+    fig,
+    1,
+    positions_left,
+    axis_rotation=LEFT_AXIS_ROTATION,
+    base_rotation=90,
+    equator_dash="solid",
+)
 add_scene(
     fig,
     2,
@@ -187,6 +229,7 @@ fig.update_layout(
         aspectmode='manual',       # control sphere scaling
         aspectratio=dict(x=1, y=1, z=1),
         camera=dict(eye=dict(x=1.25, y=1.25, z=0.5)),
+        camera_projection=dict(type="orthographic"),
     ),
     scene2=dict(
         domain=dict(x=[0.52, 0.98], y=[0.08, 0.92]),
@@ -197,6 +240,7 @@ fig.update_layout(
         aspectmode="manual",
         aspectratio=dict(x=1, y=1, z=1),
         camera=dict(eye=dict(x=1.25, y=1.25, z=0.5)),
+        camera_projection=dict(type="orthographic"),
     ),
 )
 
