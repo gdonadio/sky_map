@@ -1,5 +1,8 @@
+import json
 import os
 from pathlib import Path
+from urllib.error import URLError
+from urllib.request import urlopen
 
 import numpy as np
 import plotly.graph_objects as go
@@ -19,6 +22,23 @@ observer = eph["earth"] + Topos(
 )
 ts = load.timescale()
 time = ts.now()
+
+def fetch_current_temperature_f(latitude, longitude):
+    weather_url = (
+        "https://api.open-meteo.com/v1/forecast"
+        f"?latitude={latitude}&longitude={longitude}"
+        "&current=temperature_2m&temperature_unit=fahrenheit"
+    )
+    try:
+        with urlopen(weather_url, timeout=10) as response:
+            payload = json.load(response)
+        temperature_f = payload["current"]["temperature_2m"]
+        return f"Current Outdoor Temperature: {round(temperature_f)}\N{DEGREE SIGN}F"
+    except (KeyError, URLError, TimeoutError, ValueError):
+        return "Current Outdoor Temperature: unavailable"
+
+
+temperature_text = fetch_current_temperature_f(latitude, longitude)
 
 bodies = {
     "Sun": {"obj": eph["sun"], "magnitude": -26.74},
@@ -63,6 +83,8 @@ LEFT_AXIS_ROTATION = -12
 RIGHT_AXIS_ROTATION = 12
 LEFT_VIEW_ROTATION = 90 + LEFT_AXIS_ROTATION
 RIGHT_VIEW_ROTATION = RIGHT_AXIS_ROTATION
+SCREEN_SCALE = 1.5
+LABEL_RADIUS = 1.12
 
 # Compute body positions for each view
 positions_left, positions_right = {}, {}
@@ -81,12 +103,12 @@ fig = make_subplots(
     rows=1,
     cols=2,
     specs=[[{"type": "scene"}, {"type": "scene"}]],
-    horizontal_spacing=0.08,
+    horizontal_spacing=0.0,
 )
 
 
 def add_scene(fig, col, positions, axis_rotation=0, base_rotation=0, equator_dash="solid"):
-    camera_eye = np.array([1.25, 1.25, 0.5])
+    camera_eye = np.array([1.0416667, 1.0416667, 0.4166667])
     halo_x, halo_y, halo_z = circle_in_plane(camera_eye, radius=1.005)
     fig.add_trace(
         go.Scatter3d(
@@ -94,7 +116,7 @@ def add_scene(fig, col, positions, axis_rotation=0, base_rotation=0, equator_das
             y=halo_y,
             z=halo_z,
             mode="lines",
-            line=dict(color="rgba(0,0,0,0.07)", width=7),
+            line=dict(color="rgba(0,0,0,0.07)", width=int(round(7 * SCREEN_SCALE))),
             showlegend=False,
         ),
         row=1,
@@ -110,7 +132,10 @@ def add_scene(fig, col, positions, axis_rotation=0, base_rotation=0, equator_das
                 y=ry,
                 z=rz,
                 mode="lines",
-                line=dict(color="rgba(0,0,0,0.25)", width=1),
+                line=dict(
+                    color="rgba(0,0,0,0.25)",
+                    width=max(1, int(round(1 * SCREEN_SCALE))),
+                ),
                 showlegend=False,
             ),
             row=1,
@@ -119,7 +144,7 @@ def add_scene(fig, col, positions, axis_rotation=0, base_rotation=0, equator_das
 
     for name, (x, y, z) in positions.items():
         mag = bodies[name]["magnitude"]
-        size = (
+        size = SCREEN_SCALE * (
             6
             if name in ["Sun", "Moon"]
             else max(2, 10 + (mag - bodies["Moon"]["magnitude"]) * -1.5)
@@ -129,11 +154,24 @@ def add_scene(fig, col, positions, axis_rotation=0, base_rotation=0, equator_das
                 x=[x],
                 y=[y],
                 z=[z],
-                mode="markers+text",
+                mode="markers",
                 marker=dict(size=size, color="black"),
+                showlegend=False,
+            ),
+            row=1,
+            col=col,
+        )
+
+        label_scale = LABEL_RADIUS + (0.03 if name in ["Sun", "Moon"] else 0.0)
+        lx, ly, lz = np.array([x, y, z]) * label_scale
+        fig.add_trace(
+            go.Scatter3d(
+                x=[lx],
+                y=[ly],
+                z=[lz],
+                mode="text",
                 text=[name],
-                textposition="top center",
-                textfont=dict(size=15, color="black"),
+                textfont=dict(size=int(round(15 * SCREEN_SCALE)), color="black"),
                 showlegend=False,
             ),
             row=1,
@@ -153,7 +191,7 @@ def add_scene(fig, col, positions, axis_rotation=0, base_rotation=0, equator_das
                 y=ly,
                 z=lz,
                 mode="lines",
-                line=dict(color="black", width=2, dash="dot"),
+                line=dict(color="black", width=int(round(2 * SCREEN_SCALE)), dash="dot"),
                 showlegend=False,
             ),
             row=1,
@@ -170,9 +208,13 @@ def add_scene(fig, col, positions, axis_rotation=0, base_rotation=0, equator_das
             z=ez,
             mode="lines",
             line=(
-                dict(color="black", width=2)
+                dict(color="black", width=int(round(2 * SCREEN_SCALE)))
                 if equator_dash == "solid"
-                else dict(color="black", width=2, dash=equator_dash)
+                else dict(
+                    color="black",
+                    width=int(round(2 * SCREEN_SCALE)),
+                    dash=equator_dash,
+                )
             ),
             showlegend=False,
         ),
@@ -191,7 +233,7 @@ def add_scene(fig, col, positions, axis_rotation=0, base_rotation=0, equator_das
                 z=[lz],
                 mode="text",
                 text=[lbl],
-                textfont=dict(size=14, color="black"),
+                textfont=dict(size=int(round(14 * SCREEN_SCALE)), color="black"),
                 showlegend=False,
             ),
             row=1,
@@ -217,29 +259,42 @@ add_scene(
 
 fig.update_layout(
     showlegend=False,
-    margin=dict(l=0, r=0, t=0, b=0),  # remove outer whitespace
+    margin=dict(l=0, r=0, t=48, b=48),
     paper_bgcolor="white",
     plot_bgcolor="white",
+    annotations=[
+        dict(
+            x=0.5,
+            y=-0.02,
+            xref="paper",
+            yref="paper",
+            text=temperature_text,
+            showarrow=False,
+            font=dict(size=20, color="black"),
+            xanchor="center",
+            yanchor="top",
+        )
+    ],
     scene=dict(
-        domain=dict(x=[0.02, 0.48], y=[0.08, 0.92]),
+        domain=dict(x=[0.00, 0.50], y=[0.00, 1.00]),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
         zaxis=dict(visible=False),
         bgcolor="white",
-        aspectmode='manual',       # control sphere scaling
+        aspectmode='manual',
         aspectratio=dict(x=1, y=1, z=1),
-        camera=dict(eye=dict(x=1.25, y=1.25, z=0.5)),
+        camera=dict(eye=dict(x=1.0416667, y=1.0416667, z=0.4166667)),
         camera_projection=dict(type="orthographic"),
     ),
     scene2=dict(
-        domain=dict(x=[0.52, 0.98], y=[0.08, 0.92]),
+        domain=dict(x=[0.50, 1.00], y=[0.00, 1.00]),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
         zaxis=dict(visible=False),
         bgcolor="white",
         aspectmode="manual",
         aspectratio=dict(x=1, y=1, z=1),
-        camera=dict(eye=dict(x=1.25, y=1.25, z=0.5)),
+        camera=dict(eye=dict(x=1.0416667, y=1.0416667, z=0.4166667)),
         camera_projection=dict(type="orthographic"),
     ),
 )
