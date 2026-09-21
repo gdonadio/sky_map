@@ -299,7 +299,7 @@ fig.update_layout(
     ),
 )
 
-fig.write_image(OUTPUT_DIR / "sky_map_bw.png", width=1200, height=825, engine="kaleido")
+fig.write_image(OUTPUT_DIR / "sky_map_bw.png", width=1200, height=825)
 
 if os.environ.get("GITHUB_ACTIONS") != "true":
     fig.show()
