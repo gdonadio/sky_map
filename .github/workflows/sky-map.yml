@@ -1,8 +1,17 @@
 name: Generate Sky Map
 
+# Two maps a day (Boston time):
+#   - sunrise map, made overnight; the Inkplate shows it at 5:30 AM
+#   - sunset map, made during the day; the Inkplate shows it at 4:30 PM
+# GitHub cron runs on UTC, so each window gets four tries an hour apart:
+#   06-09 UTC = 1-4 AM EST / 2-5 AM EDT
+#   17-20 UTC = 12-3 PM EST / 1-4 PM EDT
+# The first try that succeeds writes output/sky_map_status.txt; later tries
+# see it and stop early. If a run fails, the next try makes the map.
+# Running it by hand (workflow_dispatch) always regenerates.
 on:
   schedule:
-    - cron: "28,58 * * * *"
+    - cron: "17 6-9,17-20 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -20,23 +29,43 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Check whether this map is already done
+        id: check
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          from datetime import datetime
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+
+          now = datetime.now(ZoneInfo("America/New_York"))
+          wanted = f"{now.date().isoformat()} {'sunrise' if now.hour < 12 else 'sunset'}"
+          status = Path("output/sky_map_status.txt")
+          done = status.exists() and status.read_text().strip() == wanted
+          print(f"needed={'false' if done else 'true'}")
+          EOF
+          cat "$GITHUB_OUTPUT"
+
       - name: Set up Python
+        if: github.event_name == 'workflow_dispatch' || steps.check.outputs.needed == 'true'
         uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
       - name: Install dependencies
+        if: github.event_name == 'workflow_dispatch' || steps.check.outputs.needed == 'true'
         run: pip install -r requirements.txt
 
       - name: Generate sky map
+        if: github.event_name == 'workflow_dispatch' || steps.check.outputs.needed == 'true'
         run: python sky_map_bw.py
 
       - name: Commit updated image
         id: commit_image
+        if: github.event_name == 'workflow_dispatch' || steps.check.outputs.needed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f output/sky_map_bw.png
+          git add -f output/sky_map_bw.png output/sky_map_status.txt
           if git diff --cached --quiet; then
             echo "created_commit=false" >> "$GITHUB_OUTPUT"
           else
