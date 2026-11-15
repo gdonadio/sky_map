@@ -201,10 +201,10 @@ bodies = {
 LEFT_AXIS_ROTATION, RIGHT_AXIS_ROTATION = -12, 12
 LEFT_VIEW_ROTATION = 90 + LEFT_AXIS_ROTATION
 RIGHT_VIEW_ROTATION = RIGHT_AXIS_ROTATION
-SCREEN_SCALE = 1.2
+SCREEN_SCALE = 1.5
 LABEL_RADIUS = 1.12
 CAMERA_EYE = dict(x=1.0416667, y=1.0416667, z=0.4166667)
-SPHERE_ZOOM = 1.45    # bigger = larger spheres (orthographic view ignores camera distance)
+SPHERE_ZOOM = 1.36    # sphere size; bigger = larger (orthographic view ignores camera distance)
 
 def spherical_to_cartesian(alt, az, radius=1):
     alt_rad, az_rad = np.radians(alt), np.radians(az)
@@ -279,8 +279,8 @@ add_scene(fig, "scene", LEFT_VIEW_ROTATION, body_positions(map_time, LEFT_VIEW_R
 add_scene(fig, "scene2", RIGHT_VIEW_ROTATION, body_positions(map_time, RIGHT_VIEW_ROTATION))
 
 FONT = dict(color="black", size=16)
-HEADER = dict(fill_color="white", line_color="black", font=dict(color="black", size=16), height=30)
-CELLS = dict(fill_color="white", line_color="black", font=FONT, height=30)
+HEADER = dict(fill_color="white", line_color="black", font=dict(color="black", size=16), height=28)
+CELLS = dict(fill_color="white", line_color="black", font=FONT, height=28)
 
 def cell_time(body, col):
     t = almanac_rows[body][col]
@@ -291,7 +291,7 @@ def cell_time(body, col):
 # Sun / moon table
 cols = ["Rise", "Meridian", "Set"]
 fig.add_trace(go.Table(
-    domain=dict(x=[0.01, 0.47], y=[0.20, 0.37]),
+    domain=dict(x=[0.01, 0.47], y=[0.0, 0.285]),   # tables hang down from the top of y
     columnwidth=[1.25, 1.45, 1.45, 1.45],
     header=dict(values=["", *cols], align="center", **HEADER),
     cells=dict(
@@ -307,7 +307,7 @@ fig.add_trace(go.Table(
 # Hourly table: one column per hour
 if hourly:
     fig.add_trace(go.Table(
-        domain=dict(x=[0.01, 0.99], y=[0.0, 0.17]),
+        domain=dict(x=[0.01, 0.99], y=[0.0, 0.11]),
         columnwidth=[1.3] + [1] * len(hourly),
         header=dict(values=[""] + [h["hour"] for h in hourly], align="center", **HEADER),
         cells=dict(
@@ -322,7 +322,7 @@ title = f"{map_time.astimezone(TZ):%A, %B} {map_time.astimezone(TZ).day}  ·  Sk
 annotations = [
     dict(x=0.5, y=1.0, xref="paper", yref="paper", text=title, showarrow=False,
          font=dict(size=24, color="black"), xanchor="center", yanchor="top"),
-    dict(x=0.50, y=0.365, xref="paper", yref="paper",
+    dict(x=0.50, y=0.28, xref="paper", yref="paper",
          text="<br><br>".join("<br>".join(textwrap.wrap(line, 60)) for line in forecast_lines),
          showarrow=False, align="left",
          font=dict(size=16, color="black"), xanchor="left", yanchor="top"),
@@ -341,8 +341,8 @@ fig.update_layout(
     margin=dict(l=0, r=0, t=8, b=8),
     paper_bgcolor="white", plot_bgcolor="white",
     annotations=annotations,
-    scene=dict(domain=dict(x=[0.0, 0.5], y=[0.39, 0.97]), **scene_common),
-    scene2=dict(domain=dict(x=[0.5, 1.0], y=[0.39, 0.97]), **scene_common),
+    scene=dict(domain=dict(x=[0.0, 0.5], y=[0.31, 0.97]), **scene_common),
+    scene2=dict(domain=dict(x=[0.5, 1.0], y=[0.31, 0.97]), **scene_common),
 )
 
 out_path = OUTPUT_DIR / "sky_map_bw.png"
